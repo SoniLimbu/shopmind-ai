@@ -1,3 +1,22 @@
+from django.contrib.auth.models import AbstractUser
 from django.db import models
 
-# Create your models here.
+
+class User(AbstractUser):
+
+    class Role(models.TextChoices):
+        CUSTOMER = "CUSTOMER", "Customer"
+        ADMIN = "ADMIN", "Admin"
+        PRODUCT_MANAGER = "PRODUCT_MANAGER", "Product Manager"
+        SUPPORT_AGENT = "SUPPORT_AGENT", "Support Agent"
+
+    email = models.EmailField(unique=True)
+
+    role = models.CharField(
+        max_length=30,
+        choices=Role.choices,
+        default=Role.CUSTOMER,
+    )
+
+    def __str__(self):
+        return self.email
