@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, Plus, Minus, ArrowRight } from 'lucide-react';
 import api from '../api';
 import './Cart.css';
 
 export default function Cart() {
+  const navigate = useNavigate();
   const [cart, setCart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -121,7 +122,7 @@ export default function Cart() {
             <span className="gradient-text">${cart.cart_total.toFixed(2)}</span>
           </div>
           
-          <button className="btn-primary checkout-btn">
+          <button className="btn-primary checkout-btn" onClick={() => navigate('/checkout')}>
             Proceed to Checkout <ArrowRight size={20} />
           </button>
         </div>
