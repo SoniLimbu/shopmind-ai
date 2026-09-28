@@ -16,7 +16,7 @@ export default function Navbar() {
         </div>
         <div className="nav-actions">
           <button className="icon-btn"><Search size={20} /></button>
-          <button className="icon-btn"><ShoppingCart size={20} /></button>
+          <Link to="/cart" className="icon-btn"><ShoppingCart size={20} /></Link>
           <button className="icon-btn"><User size={20} /></button>
         </div>
       </div>

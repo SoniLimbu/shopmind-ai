@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, ArrowLeft, Check, AlertCircle } from 'lucide-react';
 import api from '../api';
 import './ProductDetail.css';
 
 export default function ProductDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [mainImage, setMainImage] = useState('');
+  const [addingToCart, setAddingToCart] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -32,6 +34,26 @@ export default function ProductDetail() {
   if (loading) return <div className="container loading-state mt-page">Loading product details...</div>;
   if (error) return <div className="container error-state mt-page">{error}</div>;
   if (!product) return <div className="container empty-state mt-page">Product not found.</div>;
+
+  const handleAddToCart = async () => {
+    setAddingToCart(true);
+    try {
+      await api.post('cart/add_item/', {
+        product: product.id,
+        quantity: 1
+      });
+      // Navigate to cart page on success
+      navigate('/cart');
+    } catch (err) {
+      if (err.response && err.response.status === 401) {
+        alert("Please log in to add items to your cart!");
+      } else {
+        alert("Failed to add item to cart.");
+      }
+    } finally {
+      setAddingToCart(false);
+    }
+  };
 
   const fallbackImage = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=1000&auto=format&fit=crop';
 
@@ -104,9 +126,13 @@ export default function ProductDetail() {
           )}
           
           <div className="actions">
-            <button className="btn-primary" disabled={product.stock === 0}>
+            <button 
+              className="btn-primary" 
+              disabled={product.stock === 0 || addingToCart}
+              onClick={handleAddToCart}
+            >
               <ShoppingCart size={20} />
-              Add to Cart
+              {addingToCart ? "Adding..." : "Add to Cart"}
             </button>
           </div>
         </div>
