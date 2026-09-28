@@ -2,8 +2,9 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from .models import Cart, CartItem
-from .serializers import CartSerializer, CartItemSerializer
+from django.db import transaction
+from .models import Cart, CartItem, Order, OrderItem
+from .serializers import CartSerializer, CartItemSerializer, OrderSerializer
 
 class CartViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
@@ -74,3 +75,61 @@ class CartViewSet(viewsets.ViewSet):
             return Response(CartSerializer(cart).data, status=status.HTTP_200_OK)
         except CartItem.DoesNotExist:
             return Response({"error": "Cart item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class OrderViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = OrderSerializer
+
+    def get_queryset(self):
+        # Users can only see their own orders
+        return Order.objects.filter(user=self.request.user).order_by('-created_at')
+
+    @action(detail=False, methods=['post'])
+    @transaction.atomic
+    def checkout(self, request):
+        """Convert the user's cart into a formal Order."""
+        cart = get_object_or_404(Cart, user=request.user)
+        cart_items = cart.items.all()
+
+        if not cart_items.exists():
+            return Response({"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
+
+        shipping_address = request.data.get('shipping_address')
+        if not shipping_address:
+            return Response({"error": "Shipping address is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1. Pre-check stock levels
+        for item in cart_items:
+            if item.product.stock < item.quantity:
+                return Response({
+                    "error": f"Not enough stock for {item.product.name}. Only {item.product.stock} left."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Create the Order
+        order = Order.objects.create(
+            user=request.user,
+            shipping_address=shipping_address,
+            total_amount=sum(item.total_price for item in cart_items),
+            status='Confirmed'
+        )
+
+        # 3. Create Order Items and decrease stock
+        for item in cart_items:
+            # Snapshot the exact product name and price at time of purchase
+            OrderItem.objects.create(
+                order=order,
+                product=item.product,
+                product_name=item.product.name,
+                price=item.product.price,
+                quantity=item.quantity
+            )
+            
+            # Decrease actual product stock in the database
+            item.product.stock -= item.quantity
+            item.product.save()
+
+        # 4. Empty the Cart
+        cart.items.all().delete()
+
+        serializer = OrderSerializer(order)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
